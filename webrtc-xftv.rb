@@ -23,12 +23,14 @@ class WebrtcXFTV < Sinatra::Base
     http://code.jquery.com/jquery-1.9.1.min.js
     /__coffee__/webrtc-xftv.js
   }
+  CSS     = %w{ /css/index.css }
 
-  XFTV  = 'java -jar ./xftv.jar'
-  CONV  = ->(file,h,w,fps) { "#{XFTV} #{file} #{w} #{h} #{fps}" }
+  XFTV    = 'java -jar ./xftv.jar'
+  CONV    = ->(file,h,w,fps) { "#{XFTV} #{file} #{w} #{h} #{fps}" }
+
+  REC     = {}
 
   set :server, :thin
-  REC = {}
 
   helpers do
     def mash(data)                                              # {{{1
@@ -53,7 +55,7 @@ class WebrtcXFTV < Sinatra::Base
     end                                                         # }}}1
 
     def record(id, images, done)                                # {{{1
-      rec = REC[id] || raise 'OOPS'                             # TODO
+      rec = REC[id] or raise 'OOPS'                             # TODO
       images.each do |x|
         file = "#{rec.tmpdir}/#{rec.i}.jpg"
 
@@ -61,7 +63,7 @@ class WebrtcXFTV < Sinatra::Base
         puts "[#{id}] time: #{x.timestamp}"                   #  DEBUG
 
         File.open(file, 'w') do |f|
-          f.write Base64.decode64(x.data)
+          f.write Base64.decode64(x.image)
         end
         rec.io.puts file, x.timestamp; rec.i += 1
       end

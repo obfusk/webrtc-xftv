@@ -2,7 +2,13 @@
 %html
   %head
     %title WebRTC XFTV
-    - SCRIPTS.each do |src|
-      %script{ type: 'text/javascript', src: src }
+    - SCRIPTS.each do |x|
+      %script{ type: 'text/javascript', src: x }
+    - CSS.each do |x|
+      %link{ type: 'text/css', rel: 'stylesheet', media: 'screen',
+             href: x }/
   %body
-    -# TODO
+    %video#video
+    %canvas#canvas
+    %div
+      %button#start Start
