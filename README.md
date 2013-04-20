@@ -5,28 +5,26 @@
     Date        : 2013-04-20
 
     Copyright   : Copyright (C) 2013  Felix C. Stegerman
-    Version     : 0.0.1.SNAPSHOT
+    Version     : 0.0.2.SNAPSHOT
 
 []: }}}1
 
 ## TODO
 
-  * build!
   * test!
-  * docs!
+  * audio!
   * improve! (websockets?)
 
 ## Description
 []: {{{1
 
-  webrtc-xftv - ...
+  webrtc-xftv - record video with webrtc and xuggle-frames-to-video
 
-[]: }}}1
+  webrtc-xftv uses webrtc to record a webcam video as a series of
+  (jpeg) images with timestamps; this is sent to the backend where
+  xuggle-frames-to-video turns it into a (webm) video file.
 
-## Usage
-[]: {{{1
-
-  ...
+  See https://github.com/noxqsgit/xuggle-frames-to-video.
 
 []: }}}1
 
