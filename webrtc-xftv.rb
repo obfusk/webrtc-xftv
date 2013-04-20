@@ -29,7 +29,7 @@ class WebrtcXFTV < Sinatra::Base
               send_every: 1 }
 
   XFTV    = 'java -jar ./xftv.jar'
-  CONV    = ->(file,h,w,fps) { "#{XFTV} #{file} #{w} #{h} #{fps}" }
+  CONV    = ->(file,w,h,fps) { "#{XFTV} #{file} #{w} #{h} #{fps}" }
 
   REC     = {}
 
@@ -54,6 +54,16 @@ class WebrtcXFTV < Sinatra::Base
       { id: id }
     end                                                         # }}}1
 
+    def done_recording(rec)                                     # {{{1
+      # close input! read all output! done!
+      rec.io.close_write
+      rec.io.each { |line| puts "[conv] #{line}" }              # TODO
+      rec.io.close_read
+      FileUtils.remove_entry_secure rec.tdir
+      puts 'done.'                                            #  DEBUG
+      { link: rec.link }
+    end                                                         # }}}1
+
     def record(id, images, done)                                # {{{1
       rec = REC[id] or raise 'id not found'                     # TODO
       puts "record #{rec.to_hash.inspect}"                    #  DEBUG
@@ -66,17 +76,20 @@ class WebrtcXFTV < Sinatra::Base
         end
         rec.io.puts file, x.timestamp; rec.i += 1
       end
-      if done
-        puts 'done.'                                          #  DEBUG
-        rec.io.each { |line| } # read all output -> done
-        rec.io.close
-        FileUtils.remove_entry_secure rec.tdir
-        { link: rec.link }
-      else
-        nil
-      end
+      done ? done_recording(rec) : nil
     end                                                         # }}}1
   end
+
+  # DEBUG {                                                     # {{{1
+  # require 'pp'
+  # before /rec/ do
+  #   data = mash JSON.parse(params[:data])
+  #   data.images.each do |x|
+  #     x.image = x.image[0..10] + '...'
+  #   end if data.images
+  #   puts "--> #{request.path}"; pp data.to_hash
+  # end
+  # } DEBUG                                                     # }}}1
 
   get '/' do
     haml :index

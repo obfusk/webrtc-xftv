@@ -28,13 +28,25 @@ $ ->
   elems   = canvas: $('#canvas'), links: $('#links'), \
             start: $('#start'), video: $('#video')
 
-  ajax_err  = (xhr, stat, err)  -> alert "AJAX Error: #{err}"
-  gum_err   = (err)             -> alert "Media Error: #{err}"
+  ajax_in_progress = false
 
-  ajax_post = (url, data, s = null, e = ajax_err) ->
-    f = (data, stat, xhr) -> s && s JSON.parse data
-    $.ajax type: 'POST', url: url, success: f, error: e, \
-      data: { data: JSON.stringify data }
+  ajax_err  = (xhr, stat, err) -> alert "AJAX Error: #{err}"
+  gum_err   = (err) -> alert "Media Error: #{err}"
+
+  ajax_post = (url, data, s = null, e = ajax_err) ->            # {{{1
+    console.log 'ajax ...', url, data                         #  DEBUG
+    if ajax_in_progress
+      console.log 'ajax in progress; delaying ...'            #  DEBUG
+      setTimeout (-> ajax_post url, data, s, e), 100
+    else
+      ajax_in_progress = true
+      f = (data, stat, xhr) ->
+        ajax_in_progress = false; s JSON.parse data if s
+      g = (err) ->
+        ajax_in_progress = false; e err if e
+      $.ajax type: 'POST', url: url, success: f, error: g, \
+        data: { data: JSON.stringify data }
+                                                                # }}}1
 
   gum_succ = (stream) ->
     console.log 'gum success'                                 #  DEBUG
@@ -42,7 +54,7 @@ $ ->
     elems.video[0].play()
 
   take_pic = (ts) ->                                            # {{{1
-    console.log 'taking pic ...', st.n_pix                    #  DEBUG
+    # console.log 'taking pic ...', st.n_pix                  #  DEBUG
     ++st.n_pix
     elems.canvas[0].width  = prefs.width
     elems.canvas[0].height = prefs.height
@@ -54,12 +66,13 @@ $ ->
                                                                 # }}}1
 
   send_pix = ->
-    console.log 'sending pix ...'                             #  DEBUG
+    console.log 'sending pix ...', st.n_pix, st.images.length #  DEBUG
     send = images: st.images; st.images = []
     ajax_post "/rec/#{st.id}", send
 
   send_done = ->                                                # {{{1
-    console.log 'sending last pix ...'                        #  DEBUG
+    console.log 'sending last pix ...', st.n_pix, st.images.length
+                                                              #  DEBUG
     send = images: st.images, done: true; st.images = []
     ajax_post "/rec/#{st.id}", send, (data) ->
       li = $ '<li>'; a = $ '<a>'
@@ -69,7 +82,7 @@ $ ->
                                                                 # }}}1
 
   tick = (t) ->                                                 # {{{1
-    console.log 'tick ...'                                    # DEBUG
+    # console.log 'tick ...'                                  # DEBUG
     ts = t - st.t_start
     if (t - st.t_prev_take) >= (1000 / prefs.fps)
       st.t_prev_take = t; take_pic ts
