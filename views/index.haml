@@ -11,4 +11,12 @@
     %video#video
     %canvas#canvas
     %div
-      %button#start Start
+      #prefs
+        - PREFS.each do |k,v|
+          %label&= k
+          %input.control{ id: "prefs_#{k}", type: 'text', value: v,
+                          size: v.to_s.length }
+    %div
+      %button.control#start Start
+    %div
+      %ul#links

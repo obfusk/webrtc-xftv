@@ -9,3 +9,11 @@ html, body {
 #canvas {
   border: 1px solid blue;
 }
+
+#start {
+  font-size: 2em;
+}
+
+#prefs, #links {
+  border: 1px solid gray; display: inline-block; padding: 5px;
+}

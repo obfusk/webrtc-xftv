@@ -25,6 +25,9 @@ class WebrtcXFTV < Sinatra::Base
   }
   CSS     = %w{ /css/index.css }
 
+  PREFS   = { width: 640, height: 480, fps: 10, secs: 2,
+              send_every: 1 }
+
   XFTV    = 'java -jar ./xftv.jar'
   CONV    = ->(file,h,w,fps) { "#{XFTV} #{file} #{w} #{h} #{fps}" }
 
@@ -42,36 +45,35 @@ class WebrtcXFTV < Sinatra::Base
     end                                                         # }}}1
 
     def start_recording(w, h, fps)                              # {{{1
-      id      = SecureRandom.hex 16
-      tmpdir  = Dir.mktmpdir
-      outfile = "#{tmpdir}/out.webm"
-      io      = IO.popen CONV[outfile, w, h, fps], 'r+'
-      rec     = REC[id] = mash id: id, tmpdir: tmpdir,
-                  outfile: outfile, io: io, i: 0
-
-      puts "[#{id}] starting; #{rec.inspect}"                 #  DEBUG
-
+      id  = SecureRandom.hex 16     ; tdir  = Dir.mktmpdir
+      out = "public/out/#{id}.webm" ; link  = "/out/#{id}.webm"
+      cmd = CONV[out, w, h, fps]    ; io    = IO.popen cmd, 'r+'
+      rec = REC[id] = mash id: id, tdir: tdir, out: out, link: link,
+                        cmd: cmd, io: io, i: 0
+      puts "starting #{rec.to_hash.inspect}"                  #  DEBUG
       { id: id }
     end                                                         # }}}1
 
     def record(id, images, done)                                # {{{1
-      rec = REC[id] or raise 'OOPS'                             # TODO
+      rec = REC[id] or raise 'id not found'                     # TODO
+      puts "record #{rec.to_hash.inspect}"                    #  DEBUG
       images.each do |x|
-        file = "#{rec.tmpdir}/#{rec.i}.jpg"
-
-        puts "[#{id}] file: #{file}"                          #  DEBUG
-        puts "[#{id}] time: #{x.timestamp}"                   #  DEBUG
-
+        file = "#{rec.tdir}/#{rec.i}.jpg"
+        puts "file:      #{file}"                             #  DEBUG
+        puts "timestamp: #{x.timestamp}"                      #  DEBUG
         File.open(file, 'w') do |f|
           f.write Base64.decode64(x.image)
         end
         rec.io.puts file, x.timestamp; rec.i += 1
       end
       if done
-        puts "[#{id}] done."                                  #  DEBUG
-
-        rec.io.each { |line| } # read all output; done.
-        FileUtils.remove_entry_secure rec.tmpdir
+        puts 'done.'                                          #  DEBUG
+        rec.io.each { |line| } # read all output -> done
+        rec.io.close
+        FileUtils.remove_entry_secure rec.tdir
+        { link: rec.link }
+      else
+        nil
       end
     end                                                         # }}}1
   end
@@ -82,7 +84,8 @@ class WebrtcXFTV < Sinatra::Base
 
   post '/rec' do
     data = mash JSON.parse(params[:data])
-    start_recording(data.width, data.height, data.fps).to_json
+    args = data.values_at *%w{ width height fps }
+    start_recording(*args.map { |x| Integer x }).to_json
   end
 
   post '/rec/:id' do |id|

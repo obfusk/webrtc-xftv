@@ -1,4 +1,5 @@
 *~
 *.swp
 
+/public/out/*
 /xftv.jar
