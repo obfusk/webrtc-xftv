@@ -19,7 +19,6 @@ $ ->
             throw Error 'no *GetUserMedia'
 
   actx    = window.webkitAudioContext ||
-            window.mozAudioContext ||
             throw Error 'no *AudioContext'
 
   img_hdr = /^data:image\/jpeg;base64,/
