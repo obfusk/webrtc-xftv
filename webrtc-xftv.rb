@@ -2,7 +2,7 @@
 #
 # File        : webrtc-xftv.rb
 # Maintainer  : Felix C. Stegerman <flx@obfusk.net>
-# Date        : 2013-04-20
+# Date        : 2013-04-21
 #
 # Copyright   : Copyright (C) 2013  Felix C. Stegerman
 # Licence     : GPLv2
@@ -21,6 +21,7 @@ class WebrtcXFTV < Sinatra::Base
 
   SCRIPTS = %w{
     http://code.jquery.com/jquery-1.9.1.min.js
+    /js/recorderjs/recorder.js
     /__coffee__/webrtc-xftv.js
   }
   CSS     = %w{ /css/index.css }
@@ -31,9 +32,17 @@ class WebrtcXFTV < Sinatra::Base
   XFTV    = 'java -jar ./xftv.jar'
   CONV    = ->(file,w,h,fps) { "#{XFTV} #{file} #{w} #{h} #{fps}" }
 
-  REC     = {}
+  MERGE   = ->(a,v,o) { "ffmpeg -i #{a} -i #{v} -acodec libvorbis" +
+                        " -vcodec copy #{o}" }
 
-  set :server, :thin
+  LINK    = ->(id) {       "/out/#{id}.webm" }
+  VLINK   = ->(id) {       "/out/#{id}-v.webm" }
+
+  OUT     = ->(id) { "public/out/#{id}.webm" }
+  AOUT    = ->(id) { "public/out/#{id}-a.wav" }
+  VOUT    = ->(id) { "public/out/#{id}-v.webm" }
+
+  REC     = {}  # keep track of recordings
 
   helpers do
     def mash(data)                                              # {{{1
@@ -45,28 +54,26 @@ class WebrtcXFTV < Sinatra::Base
     end                                                         # }}}1
 
     def start_recording(w, h, fps)                              # {{{1
-      id  = SecureRandom.hex 16     ; tdir  = Dir.mktmpdir
-      out = "public/out/#{id}.webm" ; link  = "/out/#{id}.webm"
-      cmd = CONV[out, w, h, fps]    ; io    = IO.popen cmd, 'r+'
-      rec = REC[id] = mash id: id, tdir: tdir, out: out, link: link,
-                        cmd: cmd, io: io, i: 0
+      id    = SecureRandom.hex 16       ; tdir  = Dir.mktmpdir
+      cmd   = CONV[VOUT[id], w, h, fps] ; io    = IO.popen cmd, 'r+'
+      rec   = REC[id] = mash id: id, tdir: tdir, io: io, i: 0
       puts "starting #{rec.to_hash.inspect}"                  #  DEBUG
       { id: id }
     end                                                         # }}}1
 
-    def done_recording(rec)                                     # {{{1
+    def done_recording_video(rec)                               # {{{1
       # close input! read all output! done!
       rec.io.close_write
       rec.io.each { |line| puts "[conv] #{line}" }              # TODO
       rec.io.close_read
       FileUtils.remove_entry_secure rec.tdir
-      puts 'done.'                                            #  DEBUG
-      { link: rec.link }
+      rec.video_done = true
+      puts 'done recording video.'                            #  DEBUG
     end                                                         # }}}1
 
-    def record(id, images, done)                                # {{{1
+    def record(id, images, done = false)                        # {{{1
       rec = REC[id] or raise 'id not found'                     # TODO
-      puts "record #{rec.to_hash.inspect}"                    #  DEBUG
+      puts "recording video #{rec.to_hash.inspect}"           #  DEBUG
       images.each do |x|
         file = "#{rec.tdir}/#{rec.i}.jpg"
         puts "file:      #{file}"                             #  DEBUG
@@ -76,7 +83,25 @@ class WebrtcXFTV < Sinatra::Base
         end
         rec.io.puts file, x.timestamp; rec.i += 1
       end
-      done ? done_recording(rec) : nil
+      done_recording_video(rec) if done
+    end                                                         # }}}1
+
+    def merge_audio(id, audio)                                  # {{{1
+      rec = REC[id] or raise 'id not found'                     # TODO
+      raise 'not done!' unless rec.video_done                   # TODO
+      link = if audio
+        puts "merging audio #{rec.to_hash.inspect}"           #  DEBUG
+        a, v, o = AOUT[id], VOUT[id], OUT[id]
+        File.open(a, 'w') do |f|
+          f.write Base64.decode64(audio)
+        end
+        system MERGE[a, v, o] or raise 'merge failed'           # TODO
+        LINK[rec.id]
+      else
+        puts "not merging audio #{rec.to_hash.inspect}"       #  DEBUG
+        VLINK[rec.id]
+      end
+      REC.delete rec.id; { link: link }
     end                                                         # }}}1
   end
 
@@ -95,15 +120,25 @@ class WebrtcXFTV < Sinatra::Base
     haml :index
   end
 
-  post '/rec' do
+  post '/rec/start' do
     data = mash JSON.parse(params[:data])
     args = data.values_at *%w{ width height fps }
     start_recording(*args.map { |x| Integer x }).to_json
   end
 
-  post '/rec/:id' do |id|
+  post '/rec/:id/push' do |id|
     data = mash JSON.parse(params[:data])
-    record(id, data.images, data.done).to_json
+    record id, data.images; nil
+  end
+
+  post '/rec/:id/done' do |id|
+    data = mash JSON.parse(params[:data])
+    record id, data.images, true; nil
+  end
+
+  post '/rec/:id/merge' do |id|
+    data = mash JSON.parse(params[:data])
+    merge_audio(id, data.audio).to_json
   end
 
   get '/__coffee__/:name.js' do |name|
