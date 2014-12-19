@@ -30,7 +30,7 @@
   is recorded with recorderjs and then merged with the video using
   ffmpeg/avconv.
 
-  See https://github.com/noxqsgit/xuggle-frames-to-video,
+  See https://github.com/obfusk/xuggle-frames-to-video,
       https://github.com/mattdiamond/Recorderjs.
 
 []: }}}1
